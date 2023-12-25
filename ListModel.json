@@ -1,0 +1,34 @@
+{
+  "Models": [
+    {
+      "name": "CAS HD 60",
+      "baudrate": 9600,
+      "bytesize": 8,
+      "timeout": 2
+    },
+    {
+      "name": "СКЕ-60-4050",
+      "baudrate": 9600,
+      "bytesize": 8,
+      "timeout": 2
+    },
+    {
+      "name": "CAS DB-150 H",
+      "baudrate": 9600,
+      "bytesize": 8,
+      "timeout": 2
+    },
+    {
+      "name": "CAS XE-6000",
+      "baudrate": 9600,
+      "bytesize": 8,
+      "timeout": 2
+    },
+    {
+      "name": "CAS CBL-220 H",
+      "baudrate": 9600,
+      "bytesize": 8,
+      "timeout": 2
+    }
+  ]
+}
