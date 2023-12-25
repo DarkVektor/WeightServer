@@ -11,6 +11,7 @@ logging.basicConfig(level=logging.INFO, filename="py_log.log",filemode="w",
                     format="[%(asctime)s] <%(levelname)s> %(message)s")
 
 
+
 def CreateCOMPorts(COMPorts):
     for _port in COMPorts:
         t = threading.Thread(target=AddListening, args=(_port, "192.168.0.83:9100"))
@@ -140,6 +141,12 @@ logging.info("Начало работы программы")
 ports = serial.tools.list_ports.comports()
 for port in ports:
     logging.info(f"{port}")
+
+with open("ListModel.json", 'r') as file:
+    _ListModels = json.load(file)
+for model in _ListModels["Models"]:
+    print(model)
+
 #Открытие конфигурации COM-портов
 with open("config.json", 'r') as file:
     _config_params = json.load(file)
