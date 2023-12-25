@@ -1,13 +1,10 @@
-import os
-import socket
-from multiprocessing import Process
-import asyncio
-import threading
-import serial.tools.list_ports
 import datetime
 import json
 import logging
+import os
+import socket
 import threading
+import serial.tools.list_ports
 
 #Настройка логирования
 logging.basicConfig(level=logging.INFO, filename="py_log.log",filemode="w",
