@@ -1,14 +1,23 @@
 import os
 import socket
-import serial
+from multiprocessing import Process
+import asyncio
+import threading
 import serial.tools.list_ports
 import datetime
 import json
 import logging
+import threading
 
 #Настройка логирования
-logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="w",
+logging.basicConfig(level=logging.INFO, filename="py_log.log",filemode="w",
                     format="[%(asctime)s] <%(levelname)s> %(message)s")
+
+
+def CreateCOMPorts(COMPorts):
+    for _port in COMPorts:
+        t = threading.Thread(target=AddListening, args=(_port, "192.168.0.83:9100"))
+        t.start()
 
 '''
 #Чтение второй этикетки
@@ -125,9 +134,9 @@ def AddListening(COMPort, printerPort):
     except:
         print("Тут ошибка при закрытии сервака!!!!!")
     finally:
-        if _port.is_open:
+        if COMPort.is_open:
             print("Порт был открыт")
-            _port.close()
+            COMPort.close()
 
 logging.info("Начало работы программы")
 #Список всех доступных COM-портов
@@ -137,6 +146,25 @@ for port in ports:
 #Открытие конфигурации COM-портов
 with open("config.json", 'r') as file:
     _config_params = json.load(file)
+
+COMPorts = list()
+for weight in _config_params["weights"]:
+    try:
+        serialPort = serial.Serial(
+            port=weight["COM"], baudrate=weight["baudrate"], bytesize=weight["bytesize"], timeout=weight["timeout"],
+            stopbits=serial.STOPBITS_ONE
+        )
+        COMPorts.append(serialPort)
+        logging.info(f"Успешное подключение к {weight['COM']}")
+    except ValueError as ve:
+        logging.error(f"COM-порт не найден: {ve}")
+    except serial.SerialException as se:
+        logging.error(f"COM-порт используется или недоступен: {se}")
+    except Exception as e:
+        logging.error(f"ERROR: {e}")
+print(COMPorts)
+CreateCOMPorts(COMPorts)
+#asyncio.get_event_loop().run_until_complete(CreateCOMPorts(COMPorts))
 '''
 print("------------------------------------------------------------------------------")
 print(CompletionZPL({"time":"23:15", "day":"30.11.1999", "weight":1700, "shtuk":"kg"}))
@@ -148,22 +176,6 @@ print("-------------------------------------------------------------------------
 print(CompletionZPL({"time":None, "day":None, "weight":1700, "shtuk":"kg"}))
 '''
 #Добавление в список всех доступных портов
-COMPorts = list()
-for weight in _config_params["weights"]:
-    try:
-        serialPort = serial.Serial(
-            port=weight["COM"], baudrate=weight["baudrate"], bytesize=weight["bytesize"], timeout=weight["timeout"], stopbits=serial.STOPBITS_ONE
-        )
-        COMPorts.append(serialPort)
-        logging.info(f"Успешное подключение к {weight['COM']}")
-    except ValueError as ve:
-        logging.error(f"COM-порт не найден: {ve}")
-    except serial.SerialException as se:
-        logging.error(f"COM-порт используется или недоступен: {se}")
-    except Exception as e:
-        logging.error(f"ERROR: {e}")
-print(COMPorts)
-for _port in COMPorts:
-    AddListening(_port, "192.168.0.83:9100")
+
 
 logging.info("Конец работы программы")
