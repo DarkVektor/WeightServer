@@ -1,21 +1,119 @@
+import os
+import socket
+import serial.tools.list_ports
 import datetime
 import json
 import logging
-import os
-import socket
 import threading
-import serial.tools.list_ports
 
 #Настройка логирования
 logging.basicConfig(level=logging.INFO, filename="py_log.log",filemode="w",
                     format="[%(asctime)s] <%(levelname)s> %(message)s")
 
+#region Модели весов
+#Возвращает словарь моделей весов
+def GetModels():
+    with open("ListModel.json", 'r') as file:
+        _ListModels = json.load(file)
+    return _ListModels
+
+#Удаление модели весов
+def DeleteModel(nameModel):
+    models = GetModels()
+    if models.get(nameModel, None):
+        del models[nameModel]
+        with open("ListModel.json", 'w') as file:
+            json.dump(models, file, indent=4)
+        print("Успешное удаление")
+    else:
+        print("Такого значения в списке моделей нет")
+
+#Добавление/Изменение модели
+def AddModel(dictModel):
+    models = GetModels()
+    models.update(dictModel)
+    with open("ListModel.json", 'w') as file:
+        json.dump(models, file, indent=4)
+    print("Успешное добавление/изменение модели")
+#endregion
+
+#region Интерфейс
+#Возвращает словарь интерфейсов
+def GetInterface():
+    with open("ListInterface.json", 'r') as file:
+        _ListInterface = json.load(file)
+    return _ListInterface
+
+#Добавление нового Интерфейса / Перезапись интерфейса весов
+def AddInterface(dictInterface):
+    ListInterface = GetInterface()
+    ListInterface.update(dictInterface)
+    with open("ListInterface.json", 'w') as file:
+        json.dump(ListInterface, file, indent=4)
+    CreateNewCOMPort(dictInterface)
+    print("Успешное добавление/изменение Интерфейса весов")
 
 
-def CreateCOMPorts(COMPorts):
-    for _port in COMPorts:
+
+#Удаление строки интерфейса
+def DeleteInterface(numberWeight):
+    ListInterface = GetInterface()
+    if ListInterface.get(numberWeight, None):
+        DeleteCOMPort(numberWeight)
+        del ListInterface[numberWeight]
+        ListInterface = dict(sorted(ListInterface.items()))
+        with open("ListInterface.json", 'w') as file:
+            json.dump(ListInterface, file, indent=4)
+        print("Успешное удаление")
+    else:
+        print("Такого значения в списке интерфейсов нет")
+#endregion
+
+#Закрытие открытого COM-порта
+def DeleteCOMPort(numberWeight):
+    if COMPorts.get(numberWeight, None):    #Проверка на существование этого порта
+        COMPorts[numberWeight][0].close()
+        COMPorts[numberWeight][1].kill()
+        del COMPorts[numberWeight]
+        print("Закрытие COM-порта")
+
+#Открытие соединения на COM-порт
+def CreateNewCOMPort(dictCOM):
+    key = list(dictCOM.keys())[0]
+    DeleteCOMPort(key)    #Удаляет соединение, если оно существовало
+    model = GetModels().get(dictCOM[key]["model"], None)
+    if model:
+        if "COM" in dictCOM[key]["weightIP/COM"]:    #Если это COM-порт, то создается как COM-порт, иначе через сокет
+            try:
+                serialPort = serial.Serial(
+                    port=dictCOM[key]["weightIP/COM"], baudrate=model["baudrate"], bytesize=model["bytesize"], timeout=model["timeout"],
+                    stopbits=serial.STOPBITS_ONE
+                )
+                thread = threading.Thread(target=AddListening, args=(serialPort, dictCOM[key]["printerIP"]))
+                thread.start()
+                COMPort = {key: (serialPort, thread)}
+                COMPorts.update(COMPort)
+                logging.info(f"Успешное подключение к {dictCOM[key]['weightIP/COM']}")
+            except ValueError as ve:
+                logging.error(f"COM-порт не найден: {ve}")
+            except serial.SerialException as se:
+                logging.error(f"COM-порт используется или недоступен: {se}")
+            except Exception as e:
+                logging.error(f"ERROR: {e}")
+        else:
+            print(f"Создание сокета на {dictCOM['weightIP/COM']}")
+    else:
+        print("Не могу создать COM-порт с такой моделью(Возможно отсутствует данные этой модели)")
+        logging.error("Не могу создать COM-порт с такой моделью(Возможно отсутствует данные этой модели)")
+
+
+
+
+def CreateCOMPorts(COMPortsL):
+    for _port in COMPortsL:
         t = threading.Thread(target=AddListening, args=(_port, "192.168.0.83:9100"))
         t.start()
+        ThreadingList.append(t)
 
 '''
 #Чтение второй этикетки
@@ -94,7 +192,6 @@ def SendToZebra(dataToSending, printer):
             strAns = CompletionZPL({"time":None, "day":None, "weight":dataToSending[1], "shtuk":dataToSending[2]})
             '''
             #_TemplateFile = open("Template22_8.zpl", 'r')
-            _TemplateFile = open("Template50_100.zpl", 'r')
             _TemplateText = _TemplateFile.read()
             _bin_str = str.encode(_TemplateText, encoding='UTF-8')
             '''
@@ -142,23 +239,20 @@ ports = serial.tools.list_ports.comports()
 for port in ports:
     logging.info(f"{port}")
 
-with open("ListModel.json", 'r') as file:
-    _ListModels = json.load(file)
-for model in _ListModels["Models"]:
-    print(model)
-
 #Открытие конфигурации COM-портов
 with open("config.json", 'r') as file:
     _config_params = json.load(file)
 
-COMPorts = list()
+COMPorts = dict()
+COMPortsL = list()
+ThreadingList = list()
 for weight in _config_params["weights"]:
     try:
         serialPort = serial.Serial(
             port=weight["COM"], baudrate=weight["baudrate"], bytesize=weight["bytesize"], timeout=weight["timeout"],
             stopbits=serial.STOPBITS_ONE
         )
-        COMPorts.append(serialPort)
+        COMPortsL.append(serialPort)
         logging.info(f"Успешное подключение к {weight['COM']}")
     except ValueError as ve:
         logging.error(f"COM-порт не найден: {ve}")
@@ -166,8 +260,8 @@ for weight in _config_params["weights"]:
         logging.error(f"COM-порт используется или недоступен: {se}")
     except Exception as e:
         logging.error(f"ERROR: {e}")
-print(COMPorts)
-CreateCOMPorts(COMPorts)
+print(COMPortsL)
+CreateCOMPorts(COMPortsL)
 #asyncio.get_event_loop().run_until_complete(CreateCOMPorts(COMPorts))
 '''
 print("------------------------------------------------------------------------------")
@@ -181,5 +275,14 @@ print(CompletionZPL({"time":None, "day":None, "weight":1700, "shtuk":"kg"}))
 '''
 #Добавление в список всех доступных портов
 
+
+AddInterface(
+    {"5": {
+    "weightIP/COM": "COM5",
+    "model": "CAS HD 60",
+    "printerIP": "192.168.0.83:9100",
+    "data": "",
+    "time": ""}
+})
 
 logging.info("Конец работы программы")
