@@ -1,5 +1,8 @@
 import os
 import socket
+import time
+import math
+
 import serial.tools.list_ports
 import datetime
 import json
@@ -22,7 +25,7 @@ def DeleteModel(nameModel):
     answer = list()
     models = GetModels()
     if models.get(nameModel, None):
-        key_list = COMPorts.keys()
+        key_list = list(COMPorts.keys())
         listInterface = GetInterface()
         # Закрытие COM-портов, которые используют модель, которую нужно удалить
         for key in key_list:
@@ -32,7 +35,7 @@ def DeleteModel(nameModel):
         del models[nameModel]
         with open("ListModel.json", 'w') as file:
             json.dump(models, file, indent=4)
-        print("Успешное удаление")
+        print("Успешное удаление модели")
     else:
         print("Такого значения в списке моделей нет")
     return answer
@@ -89,12 +92,24 @@ def DeleteInterface(numberWeight):
 def GetCOMPorts():
     return COMPorts
 
+#Закрывает все открытые COM-порта
 def CloseAllCOMPorts():
     ports = COMPorts.copy()
     for interface in ports:
         DeleteCOMPort(interface)
     ports.clear()
 
+#Открывает все COM-порта с файла интерфейса
+def OpenALLCOMPorts():
+    dictInterface = GetInterface()
+    for key in dictInterface:
+        interface = dict.fromkeys([key], dictInterface[key])
+        CreateNewCOMPort(interface)
+
+#Перезапуск всех доступных COM-портов
+def ReloadCOMPorts():
+    CloseAllCOMPorts()
+    OpenALLCOMPorts()
 
 #Закрытие открытого COM-порта(РАБОТАЕТ КОСТЫЛЬНО)
 def DeleteCOMPort(numberWeight):
@@ -114,7 +129,10 @@ def CreateNewCOMPort(dictCOM):
                     port=dictCOM[key]["weightIP/COM"], baudrate=model["baudrate"], bytesize=model["bytesize"], timeout=model["timeout"],
                     stopbits=serial.STOPBITS_ONE
                 )
-                thread = threading.Thread(target=AddListening, args=(key, dictCOM[key]["printerIP"]))
+                if dictCOM[key]["model"] == "CKE-60-4050":
+                    thread = threading.Thread(target=AddAlwaysListening, args=(key, dictCOM[key]["printerIP"]))
+                else:
+                    thread = threading.Thread(target=AddListening, args=(key, dictCOM[key]["printerIP"]))
                 COMPort = {key: (serialPort, thread)}
                 COMPorts.update(COMPort)
                 thread.start()
@@ -132,14 +150,66 @@ def CreateNewCOMPort(dictCOM):
         print("Не могу создать COM-порт с такой моделью(Возможно отсутствует данные этой модели)")
         logging.error("Не могу создать COM-порт с такой моделью(Возможно отсутствует данные этой модели)")
 
+def AddAlwaysListening(key, printerPort):
+    COMPort = COMPorts[key][0]
+    try:
+        logging.info(f"Успешное добавление прослушивания для {COMPort.port} на Принтер {printerPort}")
+        serialString = ""  # Used to hold data coming over UART
+        prev = 0.0
+        count = 0
+        while 1:
+            if COMPort.in_waiting > 0:
+                # Read data out of the buffer until a carraige return / new line is found
+                serialString = COMPort.readline()
+                # Print the contents of the serial data
+                try:
+                    s = float(serialString.decode("Ascii").split()[0][2:-2])
+                    logging.info(f"{COMPort.port} получил: {s}")
+                    if math.isclose(prev, s) and (s > 0.1):
+                        if count < 10:
+                            count += 1
+                        elif count == 10:
+                            print(s)
+                            count += 1
+                            #SendtoZebra(s, key)
+                    else:
+                        count = 0
+                    prev = s
+                    #SendToZebra(s, key)
+                except:
+                    print("ASDASASSD")
+                    pass
+            '''# Print the contents of the serial data
+            try:
+                s = serialString.decode("Ascii").split("sn")[1]
+                print(s)
+                #logging.info(f"{COMPort.port} получил: {s}")
+                if prev == s:
+                    count += 1
+                    if count == 5:
+                        print(s)
+                        #SendToZebra(s, key)
+                else:
+                    count = 0
+                prev = s
+                # SendToZebra(s, key)
+            except:
+                print("ASDASASSD")
+                pass'''
+    except:
+        print(f"Прерывание прослушивания {COMPort.port}!!!!!")
+    finally:
+        if COMPort.is_open:
+            COMPort.close()
+
 #Постоянная прослушка COM-порта
 def AddListening(key, printerPort):
     COMPort = COMPorts[key][0]
-
     try:
         logging.info(f"Успешное добавление прослушивания для {COMPort.port} на Принтер {printerPort}")
         serialString = ""  # Used to hold data coming over UART
         while 1:
+            #print(COMPort.readline())
             # Wait until there is data waiting in the serial buffer
             if COMPort.in_waiting > 0:
                 # Read data out of the buffer until a carraige return / new line is found
@@ -198,6 +268,7 @@ def ReadZPL(filePath, valsinTable):
             logging.error(f"Ошибка при чтении шаблона: {e}")
     return listNames, valsinTable
 '''
+#Создание этикетки с данными
 def CompletionZPL(dict):
     _answerString = ""
     if os.path.exists("Template22_8.zpl"):
@@ -228,6 +299,7 @@ def CompletionZPL(dict):
             _answerString += '^' + _stringArr[i]
     return _answerString
 
+
 def CreateTemplateDict(dataToSending, key):
     d = dict()
     listInterface = GetInterface()
@@ -252,11 +324,6 @@ def SendToZebra(dataToSending, key):
             client.connect((_address[0], int(_address[1])))
             strAns = CompletionZPL(CreateTemplateDict(dataToSending, key))
             #strAns = CompletionZPL({"time":None, "day":None, "weight":dataToSending[1], "shtuk":dataToSending[2]})
-            '''
-            #_TemplateFile = open("Template22_8.zpl", 'r')
-            _TemplateText = _TemplateFile.read()
-            _bin_str = str.encode(_TemplateText, encoding='UTF-8')
-            '''
             _bin_str = str.encode(strAns, encoding='UTF-8')
             print(_bin_str)
             client.sendall(_bin_str)
@@ -282,21 +349,54 @@ with open("config.json", 'r') as file:
 
 COMPorts = dict()
 ThreadingList = list()
-dictInterface = GetInterface()
-for key in dictInterface:
-    interface = dict.fromkeys([key],dictInterface[key])
-    CreateNewCOMPort(interface)
+OpenALLCOMPorts()
 print("Конец добавления портов")
-print(COMPorts)
 
-AddInterface(
-    {"3": {
+print(COMPorts)
+'''print(GetModels())
+AddModel({"ABCD": {
+        "baudrate": 9600,
+        "bytesize": 5,
+        "timeout": 2
+    }})
+print(GetModels())
+AddModel({"ABCD": {
+        "baudrate": 9600,
+        "bytesize": 8,
+        "timeout": 2
+    }})
+print(GetModels())
+AddInterface({"3": {
+    "weightIP/COM": "COM3",
+    "model": "ABCD",
+    "printerIP": "192.168.0.84:9100",
+    "data": "",
+    "time": ""}
+})
+print(COMPorts)
+DeleteModel("ABC")
+DeleteModel("ABCD")
+print(GetModels())
+print(COMPorts)
+ReloadCOMPorts()
+print(COMPorts)
+AddInterface({"3": {
     "weightIP/COM": "COM3",
     "model": "CAS HD 60",
     "printerIP": "192.168.0.83:9100",
     "data": "",
     "time": ""}
 })
+print(COMPorts)
+CloseAllCOMPorts()
+'''
+
+
+
+
+'''
+
+
 print(COMPorts)
 AddInterface(
     {"3": {
@@ -307,37 +407,16 @@ AddInterface(
     "time": ""}
 })
 print(COMPorts)
+AddInterface(
+    {"3": {
+    "weightIP/COM": "COM3",
+    "model": "CAS HD 60",
+    "printerIP": "192.168.0.83:9100",
+    "data": "",
+    "time": ""}
+})
+print(COMPorts)
 #CloseAllCOMPorts()
 print(COMPorts)
-
+'''
 logging.info("Конец работы программы")
-'''
-for weight in _config_params["weights"]:
-    try:
-        serialPort = serial.Serial(
-            port=weight["COM"], baudrate=weight["baudrate"], bytesize=weight["bytesize"], timeout=weight["timeout"],
-            stopbits=serial.STOPBITS_ONE
-        )
-        COMPortsL.append(serialPort)
-        logging.info(f"Успешное подключение к {weight['COM']}")
-    except ValueError as ve:
-        logging.error(f"COM-порт не найден: {ve}")
-    except serial.SerialException as se:
-        logging.error(f"COM-порт используется или недоступен: {se}")
-    except Exception as e:
-        logging.error(f"ERROR: {e}")
-'''
-#asyncio.get_event_loop().run_until_complete(CreateCOMPorts(COMPorts))
-'''
-print("------------------------------------------------------------------------------")
-print(CompletionZPL({"time":"23:15", "day":"30.11.1999", "weight":1700, "shtuk":"kg"}))
-print("------------------------------------------------------------------------------")
-print(CompletionZPL({"time":"14:15", "day":None, "weight":1700, "shtuk":"kg"}))
-print("------------------------------------------------------------------------------")
-print(CompletionZPL({"time":None, "day":"30.11.1999", "weight":1700, "shtuk":"kg"}))
-print("------------------------------------------------------------------------------")
-print(CompletionZPL({"time":None, "day":None, "weight":1700, "shtuk":"kg"}))
-'''
-#Добавление в список всех доступных портов
-
-
