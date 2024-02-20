@@ -165,19 +165,18 @@ def AddAlwaysListening(key, printerPort):
                 try:
                     s = float(serialString.decode("Ascii").split()[0][2:-2])
                     logging.info(f"{COMPort.port} получил: {s}")
-                    if math.isclose(prev, s) and (s > 0.1):
-                        if count < 10:
+                    if s < prev + 0.3 and s > prev - 0.3 and (s > 0.1):
+                        if count < 30:
                             count += 1
-                        elif count == 10:
+                        elif count == 30:
                             print(s)
                             count += 1
-                            #SendtoZebra(s, key)
+                            SendToZebra(s, key)
                     else:
                         count = 0
                     prev = s
-                    #SendToZebra(s, key)
                 except:
-                    print("ASDASASSD")
+                    #print("ASDASASSD")
                     pass
             '''# Print the contents of the serial data
             try:
@@ -219,7 +218,7 @@ def AddListening(key, printerPort):
                     s = serialString.decode("Ascii").split()
                     logging.info(f"{COMPort.port} получил: {s}")
                     print(s)
-                    #SendToZebra(s, key)
+                    SendToZebra(s, key)
                 except:
                     print("ASDASASSD")
                     pass
