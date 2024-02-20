@@ -126,7 +126,10 @@ def CreateNewCOMPort(dictCOM):
         if "COM" in dictCOM[key]["weightIP/COM"]:    #Если это COM-порт, то создается как COM-порт, иначе через сокет
             try:
                 serialPort = serial.Serial(
-                    port=dictCOM[key]["weightIP/COM"], baudrate=model["baudrate"], bytesize=model["bytesize"], timeout=model["timeout"],
+                    port=dictCOM[key]["weightIP/COM"],
+                    baudrate=model["baudrate"],
+                    bytesize=model["bytesize"],
+                    timeout=model["timeout"],
                     stopbits=serial.STOPBITS_ONE
                 )
                 if dictCOM[key]["model"] == "CKE-60-4050":
@@ -150,6 +153,19 @@ def CreateNewCOMPort(dictCOM):
         print("Не могу создать COM-порт с такой моделью(Возможно отсутствует данные этой модели)")
         logging.error("Не могу создать COM-порт с такой моделью(Возможно отсутствует данные этой модели)")
 
+#Перевод данных с COMорта в массив данных для шаблона
+def DataToWeight(strCOM):
+    s = ""
+    v = ""
+    num = False
+    for c in strCOM:
+        if c.isdigit() or c == '.' or c == ',':
+            num = True
+            s += c
+        elif num and c != ' ':
+            v += c
+    return [s, v]
+
 def AddAlwaysListening(key, printerPort):
     COMPort = COMPorts[key][0]
     try:
@@ -163,15 +179,17 @@ def AddAlwaysListening(key, printerPort):
                 serialString = COMPort.readline()
                 # Print the contents of the serial data
                 try:
-                    s = float(serialString.decode("Ascii").split()[0][2:-2])
-                    logging.info(f"{COMPort.port} получил: {s}")
+                    weight = DataToWeight(serialString.decode("Ascii"))
+                    s = float(weight[0])
+                    #s = float(serialString.decode("Ascii").split()[0][2:-2])
+                    logging.info(f"{COMPort.port} получил: {weight}")
                     if s < prev + 0.3 and s > prev - 0.3 and (s > 0.1):
                         if count < 30:
                             count += 1
                         elif count == 30:
-                            print(s)
+                            #print(s)
                             count += 1
-                            SendToZebra(s, key)
+                            SendToZebra(weight, key)
                     else:
                         count = 0
                     prev = s
@@ -215,10 +233,9 @@ def AddListening(key, printerPort):
                 serialString = COMPort.readline()
                 # Print the contents of the serial data
                 try:
-                    s = serialString.decode("Ascii").split()
-                    logging.info(f"{COMPort.port} получил: {s}")
-                    print(s)
-                    SendToZebra(s, key)
+                    weight = DataToWeight(serialString.decode("Ascii"))
+                    logging.info(f"{COMPort.port} получил: {weight}")
+                    SendToZebra(weight, key)
                 except:
                     print("ASDASASSD")
                     pass
@@ -310,8 +327,8 @@ def CreateTemplateDict(dataToSending, key):
         d['day'] = None
     else:
         d['day'] = listInterface[key]['day']
-    d['weight'] = dataToSending[1]
-    d['shtuk'] = dataToSending[2]
+    d['weight'] = dataToSending[0]
+    d['shtuk'] = dataToSending[1]
     return d
 
 #Отправка задания на Принтер
