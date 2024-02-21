@@ -170,7 +170,6 @@ def AddAlwaysListening(key, printerPort):
     COMPort = COMPorts[key][0]
     try:
         logging.info(f"Успешное добавление прослушивания для {COMPort.port} на Принтер {printerPort}")
-        serialString = ""  # Used to hold data coming over UART
         prev = 0.0
         count = 0
         while 1:
@@ -180,19 +179,20 @@ def AddAlwaysListening(key, printerPort):
                 # Print the contents of the serial data
                 try:
                     weight = DataToWeight(serialString.decode("Ascii"))
-                    s = float(weight[0])
-                    #s = float(serialString.decode("Ascii").split()[0][2:-2])
-                    logging.info(f"{COMPort.port} получил: {weight}")
-                    if s < prev + 0.3 and s > prev - 0.3 and (s > 0.1):
-                        if count < 30:
-                            count += 1
-                        elif count == 30:
-                            #print(s)
-                            count += 1
-                            SendToZebra(weight, key)
-                    else:
-                        count = 0
-                    prev = s
+                    if weight[0] != '':
+                        s = float(weight[0])
+                        #s = float(serialString.decode("Ascii").split()[0][2:-2])
+                        logging.info(f"{COMPort.port} получил: {weight}")
+                        if s < prev + 0.3 and s > prev - 0.3 and (s > 0.1):
+                            if count < 30:
+                                count += 1
+                            elif count == 30:
+                                #print(s)
+                                count += 1
+                                SendToZebra(weight, key)
+                        else:
+                            count = 0
+                        prev = s
                 except:
                     #print("ASDASASSD")
                     pass
@@ -234,8 +234,9 @@ def AddListening(key, printerPort):
                 # Print the contents of the serial data
                 try:
                     weight = DataToWeight(serialString.decode("Ascii"))
-                    logging.info(f"{COMPort.port} получил: {weight}")
-                    SendToZebra(weight, key)
+                    if weight[0] != '':
+                        logging.info(f"{COMPort.port} получил: {weight}")
+                        SendToZebra(weight, key)
                 except:
                     print("ASDASASSD")
                     pass
@@ -298,8 +299,8 @@ def CompletionZPL(dict):
             if _stringArr[i][:2] == "FN":
                 match count:
                     case 0:
-                        if (dict["day"]):
-                            tempString = "FD" + dict["day"]
+                        if (dict["data"]):
+                            tempString = "FD" + dict["data"]
                         else:
                             tempString = "FD" + datetime.datetime.now().strftime("%d.%m.%y")
                     case 1:
@@ -323,10 +324,10 @@ def CreateTemplateDict(dataToSending, key):
         d['time'] = None
     else:
         d['time'] = listInterface[key]['time']
-    if listInterface[key]['day'] == "":
-        d['day'] = None
+    if listInterface[key]['data'] == "":
+        d['data'] = None
     else:
-        d['day'] = listInterface[key]['day']
+        d['data'] = listInterface[key]['data']
     d['weight'] = dataToSending[0]
     d['shtuk'] = dataToSending[1]
     return d
