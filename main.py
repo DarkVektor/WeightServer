@@ -189,7 +189,9 @@ def AddAlwaysListening(key, printerPort):
                             elif count == 30:
                                 #print(s)
                                 count += 1
-                                SendToZebra(weight, key)
+                                thread = threading.Thread(target=SendToZebra, args=(weight, key))
+                                thread.start()
+                                #SendToZebra(weight, key)
                         else:
                             count = 0
                         prev = s
@@ -236,7 +238,9 @@ def AddListening(key, printerPort):
                     weight = DataToWeight(serialString.decode("Ascii"))
                     if weight[0] != '':
                         logging.info(f"{COMPort.port} получил: {weight}")
-                        SendToZebra(weight, key)
+                        thread = threading.Thread(target=SendToZebra, args=(weight, key))
+                        thread.start()
+                        #SendToZebra(weight, key)
                 except:
                     print("ASDASASSD")
                     pass
