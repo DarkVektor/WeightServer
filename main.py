@@ -1,17 +1,11 @@
 import os
 import socket
-import time
-import math
-
 import serial.tools.list_ports
 import datetime
 import json
 import logging
 import threading
-
-#Настройка логирования
-logging.basicConfig(level=logging.INFO, filename="py_log.log",filemode="w",
-                    format="[%(asctime)s] <%(levelname)s> %(message)s")
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 #region Модели весов
 #Возвращает словарь моделей весов
@@ -88,6 +82,7 @@ def DeleteInterface(numberWeight):
         print("Такого значения в списке интерфейсов нет")
 #endregion
 
+#region COMпорт
 #Возвращает список подключенных COM-портов
 def GetCOMPorts():
     return COMPorts
@@ -166,6 +161,7 @@ def DataToWeight(strCOM):
             v += c
     return [s, v]
 
+#Прослушка COMпорта
 def AddAlwaysListening(key, printerPort):
     COMPort = COMPorts[key][0]
     try:
@@ -181,13 +177,11 @@ def AddAlwaysListening(key, printerPort):
                     weight = DataToWeight(serialString.decode("Ascii"))
                     if weight[0] != '':
                         s = float(weight[0])
-                        #s = float(serialString.decode("Ascii").split()[0][2:-2])
                         logging.info(f"{COMPort.port} получил: {weight}")
                         if s < prev + 0.3 and s > prev - 0.3 and (s > 0.1):
                             if count < 30:
                                 count += 1
                             elif count == 30:
-                                #print(s)
                                 count += 1
                                 thread = threading.Thread(target=SendToZebra, args=(weight, key))
                                 thread.start()
@@ -198,23 +192,6 @@ def AddAlwaysListening(key, printerPort):
                 except:
                     #print("ASDASASSD")
                     pass
-            '''# Print the contents of the serial data
-            try:
-                s = serialString.decode("Ascii").split("sn")[1]
-                print(s)
-                #logging.info(f"{COMPort.port} получил: {s}")
-                if prev == s:
-                    count += 1
-                    if count == 5:
-                        print(s)
-                        #SendToZebra(s, key)
-                else:
-                    count = 0
-                prev = s
-                # SendToZebra(s, key)
-            except:
-                print("ASDASASSD")
-                pass'''
     except:
         print(f"Прерывание прослушивания {COMPort.port}!!!!!")
     finally:
@@ -250,7 +227,6 @@ def AddListening(key, printerPort):
         if COMPort.is_open:
             COMPort.close()
 
-
 '''
 def CreateCOMPorts(COMPortsL):
     for _port in COMPortsL:
@@ -258,37 +234,7 @@ def CreateCOMPorts(COMPortsL):
         t.start()
         ThreadingList.append(t)
 '''
-'''
-#Чтение второй этикетки
-def ReadZPL(filePath, valsinTable):
-    listNames = list()
-    if not(os.path.exists(filePath)):
-        return listNames, valsinTable
-    else:
-        print("Такой шаблон есть")
-        try:
-            _TemplateFile = open(filePath, 'r', encoding='UTF-8')
-            strArray = _TemplateFile.read().split('^')
-            print(strArray)
-            index = 0
-            while True:
-                if (index >= len(strArray)):
-                    break
-                q = len(strArray[index]) > 3
-                print(strArray[index][:2])
-                if (q and strArray[index][:2] == "FN"):
-                    if (len(strArray[index].split('"')) > 2):
-                        listNames.append(strArray[index].split('"')[1])
-                        valsinTable.append(strArray[index + 1][2:])
-                        print(listNames)
-                        print(valsinTable)
-                        print("-----------")
-                index += 1
-        except Exception as e:
-            print(f"Ошибка при чтении шаблона: {e}")
-            logging.error(f"Ошибка при чтении шаблона: {e}")
-    return listNames, valsinTable
-'''
+#region Zebra
 #Создание этикетки с данными
 def CompletionZPL(dict):
     _answerString = ""
@@ -344,7 +290,6 @@ def SendToZebra(dataToSending, key):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
             client.connect((_address[0], int(_address[1])))
             strAns = CompletionZPL(CreateTemplateDict(dataToSending, key))
-            #strAns = CompletionZPL({"time":None, "day":None, "weight":dataToSending[1], "shtuk":dataToSending[2]})
             _bin_str = str.encode(strAns, encoding='UTF-8')
             print(_bin_str)
             client.sendall(_bin_str)
@@ -355,89 +300,62 @@ def SendToZebra(dataToSending, key):
         logging.error(f"Error Sending: {e}")
     finally:
         client.close()
+#endregion
 
+#endregion
 
+#Мини-сервер API
+def CreateServer(host, port):
+    class HandleRequests(BaseHTTPRequestHandler):
+        def _set_headers(self):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
 
-logging.info("Начало работы программы")
-#Список всех доступных COM-портов
-ports = serial.tools.list_ports.comports()
-for port in ports:
-    logging.info(f"{port}")
+        def do_GET(self):
+            self._set_headers()
+            ans = ''
+            if self.path == '/models':
+                ans = str(GetModels())
+            elif self.path == '/interfaces':
+                ans = str(GetInterface()) + '\n' + str(GetCOMPorts())
+            ans = ans.encode('utf-8')
+            self.wfile.write(ans)
 
-#Открытие конфигурации COM-портов
-with open("config.json", 'r') as file:
-    _config_params = json.load(file)
+        def do_POST(self):
+            '''Reads post request body'''
+            self._set_headers()
+            content_len = int(self.headers.getheader('content-length', 0))
+            post_body = self.rfile.read(content_len)
+            self.wfile.write("received post request:<br>{}".format(post_body))
 
-COMPorts = dict()
-ThreadingList = list()
-OpenALLCOMPorts()
-print("Конец добавления портов")
+        def do_PUT(self):
+            self.do_POST()
 
-print(COMPorts)
-'''print(GetModels())
-AddModel({"ABCD": {
-        "baudrate": 9600,
-        "bytesize": 5,
-        "timeout": 2
-    }})
-print(GetModels())
-AddModel({"ABCD": {
-        "baudrate": 9600,
-        "bytesize": 8,
-        "timeout": 2
-    }})
-print(GetModels())
-AddInterface({"3": {
-    "weightIP/COM": "COM3",
-    "model": "ABCD",
-    "printerIP": "192.168.0.84:9100",
-    "data": "",
-    "time": ""}
-})
-print(COMPorts)
-DeleteModel("ABC")
-DeleteModel("ABCD")
-print(GetModels())
-print(COMPorts)
-ReloadCOMPorts()
-print(COMPorts)
-AddInterface({"3": {
-    "weightIP/COM": "COM3",
-    "model": "CAS HD 60",
-    "printerIP": "192.168.0.83:9100",
-    "data": "",
-    "time": ""}
-})
-print(COMPorts)
-CloseAllCOMPorts()
-'''
+        def do_DELETE(self):
+            pass
 
+    try:
+        httpd = HTTPServer((host, int(port)), HandleRequests).serve_forever()
+    except Exception:
+        httpd.shutdown()
 
-
-
-'''
-
-
-print(COMPorts)
-AddInterface(
-    {"3": {
-    "weightIP/COM": "COM3",
-    "model": "CAS HD 60",
-    "printerIP": "192.168.0.84:9100",
-    "data": "",
-    "time": ""}
-})
-print(COMPorts)
-AddInterface(
-    {"3": {
-    "weightIP/COM": "COM3",
-    "model": "CAS HD 60",
-    "printerIP": "192.168.0.83:9100",
-    "data": "",
-    "time": ""}
-})
-print(COMPorts)
-#CloseAllCOMPorts()
-print(COMPorts)
-'''
-logging.info("Конец работы программы")
+if __name__ == '__main__':
+    # Настройка логирования
+    logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="a", format="[%(asctime)s] <%(levelname)s> %(message)s") #w/a
+    logging.info("Начало работы программы")
+    #Список всех доступных COM-портов
+    ports = serial.tools.list_ports.comports()
+    for port in ports:
+        logging.info(f"{port}")
+    #Открытие конфигурации COM-портов
+    with open("config.json", 'r') as file:
+        _config_params = json.load(file)
+    thread = threading.Thread(target=CreateServer, args=(_config_params['server']['host'], _config_params['server']['port']))
+    thread.start()
+    COMPorts = dict()
+    ThreadingList = list()
+    OpenALLCOMPorts()
+    print("Конец добавления портов")
+    print(COMPorts)
+    logging.info("Конец работы программы")
