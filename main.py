@@ -85,7 +85,10 @@ def DeleteInterface(numberWeight):
 #region COMпорт
 #Возвращает список подключенных COM-портов
 def GetCOMPorts():
-    return COMPorts
+    d = dict()
+    for key in COMPorts:
+        d[key]=None
+    return d
 
 #Закрывает все открытые COM-порта
 def CloseAllCOMPorts():
@@ -177,11 +180,11 @@ def AddAlwaysListening(key, printerPort):
                     weight = DataToWeight(serialString.decode("Ascii"))
                     if weight[0] != '':
                         s = float(weight[0])
-                        logging.info(f"{COMPort.port} получил: {weight}")
                         if s < prev + 0.3 and s > prev - 0.3 and (s > 0.1):
                             if count < 30:
                                 count += 1
                             elif count == 30:
+                                logging.info(f"{COMPort.port} получил: {weight}")
                                 count += 1
                                 thread = threading.Thread(target=SendToZebra, args=(weight, key))
                                 thread.start()
@@ -315,10 +318,10 @@ def CreateServer(host, port):
         def do_GET(self):
             self._set_headers()
             ans = ''
-            if self.path == '/models':
+            if self.path == '/Models':
                 ans = str(GetModels())
-            elif self.path == '/interfaces':
-                ans = str(GetInterface()) + '\n' + str(GetCOMPorts())
+            elif self.path == '/Interfaces':
+                ans = str(GetInterface()) + ';' + str(GetCOMPorts())
             ans = ans.encode('utf-8')
             self.wfile.write(ans)
 
@@ -330,7 +333,17 @@ def CreateServer(host, port):
             self.wfile.write("received post request:<br>{}".format(post_body))
 
         def do_PUT(self):
-            self.do_POST()
+            self._set_headers()
+            if self.path == '/ReloadInterfaces':
+                try:
+                    ReloadCOMPorts()
+                    ans = 'Reloaded'
+                except Exception as e:
+                    ans = 'Not reloaded'
+                    print(e)
+                self.wfile.write(ans.encode('utf-8'))
+
+
 
         def do_DELETE(self):
             pass
@@ -342,7 +355,7 @@ def CreateServer(host, port):
 
 if __name__ == '__main__':
     # Настройка логирования
-    logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="a", format="[%(asctime)s] <%(levelname)s> %(message)s") #w/a
+    logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="w", format="[%(asctime)s] <%(levelname)s> %(message)s") #w/a
     logging.info("Начало работы программы")
     #Список всех доступных COM-портов
     ports = serial.tools.list_ports.comports()
