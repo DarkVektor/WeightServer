@@ -6,6 +6,7 @@ import json
 import logging
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs
 
 #region Модели весов
 #Возвращает словарь моделей весов
@@ -63,10 +64,13 @@ def AddInterface(dictInterface):
         answer = "Успешное добавление " + answer
     #Такого интерфейса ещё нет, нужно создать новый и подключить его
     ListInterface.update(dictInterface)
-    CreateNewCOMPort(dictInterface)
     with open("ListInterface.json", 'w') as file:
         json.dump(ListInterface, file, indent=4)
     print(answer)
+    if CreateNewCOMPort(dictInterface):
+        return True
+    else:
+        return False
 
 #Удаление строки интерфейса
 def DeleteInterface(numberWeight):
@@ -80,6 +84,8 @@ def DeleteInterface(numberWeight):
         print("Успешное удаление")
     else:
         print("Такого значения в списке интерфейсов нет")
+        return False
+    return True
 #endregion
 
 #region COMпорт
@@ -115,6 +121,7 @@ def DeleteCOMPort(numberWeight):
         COMPorts[numberWeight][0].close()
         del COMPorts[numberWeight]
 
+
 #Открытие соединения на COM-порт
 def CreateNewCOMPort(dictCOM):
     key = list(dictCOM.keys())[0]
@@ -139,17 +146,23 @@ def CreateNewCOMPort(dictCOM):
                 thread.start()
                 print(f"Успешное подключение к {dictCOM[key]['weightIP/COM']}")
                 logging.info(f"Успешное подключение к {dictCOM[key]['weightIP/COM']}")
+                return True
             except ValueError as ve:
                 logging.error(f"COM-порт не найден: {ve}")
+                return False
             except serial.SerialException as se:
                 logging.error(f"COM-порт используется или недоступен: {se}")
+                return False
             except Exception as e:
                 logging.error(f"ERROR: {e}")
+                return False
         else:
             print(f"Создание сокета на {dictCOM[key]['weightIP/COM']}")
+            return False
     else:
         print("Не могу создать COM-порт с такой моделью(Возможно отсутствует данные этой модели)")
         logging.error("Не могу создать COM-порт с такой моделью(Возможно отсутствует данные этой модели)")
+        return False
 
 #Перевод данных с COMорта в массив данных для шаблона
 def DataToWeight(strCOM):
@@ -326,11 +339,23 @@ def CreateServer(host, port):
             self.wfile.write(ans)
 
         def do_POST(self):
-            '''Reads post request body'''
-            self._set_headers()
-            content_len = int(self.headers.getheader('content-length', 0))
-            post_body = self.rfile.read(content_len)
-            self.wfile.write("received post request:<br>{}".format(post_body))
+            if self.path == '/AddInterface':
+                ans = ''
+                try:
+                    l = self.headers['Content-Length']
+                    text = self.rfile.read(int(l)).decode()
+                    d = eval(text)
+                    if not AddInterface(d):
+                        ans = 'Not Added'
+                    else:
+                        ans = 'Added'
+                except Exception as e:
+                    print(f'Ошибка: {e}')
+                    ans = 'Error'
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(ans.encode('utf-8'))
 
         def do_PUT(self):
             self._set_headers()
@@ -343,10 +368,24 @@ def CreateServer(host, port):
                     print(e)
                 self.wfile.write(ans.encode('utf-8'))
 
-
-
         def do_DELETE(self):
-            pass
+            ans = dict()
+            if self.path == '/Interfaces':
+                try:
+                    l = self.headers['Content-Length']
+                    text = self.rfile.read(int(l)).decode()
+                    d = eval(text)
+                    for key in d:
+                        if not DeleteInterface(key):
+                            ans[key] = False
+                    self.send_response(201)
+                except Exception as e:
+                    self.send_response(400)
+                    print(f'Ошибка: {e}')
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                ans = str(ans)
+                self.wfile.write(ans.encode('utf-8'))
 
     try:
         httpd = HTTPServer((host, int(port)), HandleRequests).serve_forever()
