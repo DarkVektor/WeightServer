@@ -13,29 +13,15 @@
         "data": "",
         "time": ""
     },
+    "3": {
+        "weightIP/COM": "COM5",
+        "model": "CKE-60-4050",
+        "printerIP": "192.168.9.69:9100",
+        "data": "",
+        "time": ""
+    },
     "4": {
         "weightIP/COM": "COM4",
-        "model": "CKE-60-4050",
-        "printerIP": "192.168.9.69:9100",
-        "data": "",
-        "time": ""
-    },
-    "7": {
-        "weightIP/COM": "COM7",
-        "model": "CKE-60-4050",
-        "printerIP": "192.168.9.69:9100",
-        "data": "",
-        "time": ""
-    },
-    "8": {
-        "weightIP/COM": "COM8",
-        "model": "CKE-60-4050",
-        "printerIP": "192.168.9.69:9100",
-        "data": "",
-        "time": ""
-    },
-    "3": {
-        "weightIP/COM": "COM3",
         "model": "CKE-60-4050",
         "printerIP": "192.168.9.69:9100",
         "data": "",

@@ -339,7 +339,7 @@ def CreateServer(host, port):
             self.wfile.write(ans)
 
         def do_POST(self):
-            if self.path == '/AddInterface':
+            if self.path == '/AddInterface' or self.path == '/ChangeInterface':
                 ans = ''
                 try:
                     l = self.headers['Content-Length']
@@ -358,8 +358,8 @@ def CreateServer(host, port):
                 self.wfile.write(ans.encode('utf-8'))
 
         def do_PUT(self):
-            self._set_headers()
             if self.path == '/ReloadInterfaces':
+                self._set_headers()
                 try:
                     ReloadCOMPorts()
                     ans = 'Reloaded'
@@ -367,6 +367,8 @@ def CreateServer(host, port):
                     ans = 'Not reloaded'
                     print(e)
                 self.wfile.write(ans.encode('utf-8'))
+            elif self.path == '/ChangeInterface':
+                self.do_POST()
 
         def do_DELETE(self):
             ans = dict()
