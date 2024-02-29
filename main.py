@@ -33,6 +33,7 @@ def DeleteModel(nameModel):
         print("Успешное удаление модели")
     else:
         print("Такого значения в списке моделей нет")
+    #Возвращает массив Номеров весов, которые использовали удаленную модель
     return answer
 
 #Добавление/Изменение модели
@@ -41,7 +42,15 @@ def AddModel(dictModel):
     models.update(dictModel)
     with open("ListModel.json", 'w') as file:
         json.dump(models, file, indent=4)
+    listInterface = GetInterface()
+    for key in COMPorts:
+        if listInterface[key]['model'] == dictModel.keys()[0]:
+            DeleteCOMPort(key)
+            if not CreateNewCOMPort(dict.fromkeys([key], listInterface[key])):
+                print('Модель добавилась/СОМпорт не запущен')
+                return False
     print("Успешное добавление/изменение модели")
+    return True
 #endregion
 
 #region Интерфейс
@@ -356,6 +365,23 @@ def CreateServer(host, port):
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 self.wfile.write(ans.encode('utf-8'))
+            if self.path == '/AddModels' or self.path == '/ChangeModels':
+                ans = ''
+                try:
+                    l = self.headers['Content-Length']
+                    text = self.rfile.read(int(l)).decode()
+                    d = eval(text)
+                    if AddModel(d):
+                        ans = 'Added'
+                    else:
+                        ans = 'Not Added'
+                except Exception as e:
+                    print(f'Ошибка: {e}')
+                    ans = 'Error'
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(ans.encode('utf-8'))
 
         def do_PUT(self):
             if self.path == '/ReloadInterfaces':
@@ -367,7 +393,7 @@ def CreateServer(host, port):
                     ans = 'Not reloaded'
                     print(e)
                 self.wfile.write(ans.encode('utf-8'))
-            elif self.path == '/ChangeInterface':
+            if self.path == '/ChangeInterface' or self.path == '/ChangeModels':
                 self.do_POST()
 
         def do_DELETE(self):
@@ -388,7 +414,27 @@ def CreateServer(host, port):
                 self.end_headers()
                 ans = str(ans)
                 self.wfile.write(ans.encode('utf-8'))
-
+            if self.path == '/Models':
+                #lm = list()
+                ans = dict()
+                try:
+                    l = self.headers['Content-Length']
+                    text = self.rfile.read(int(l)).decode()
+                    d = eval(text)
+                    for model in d:
+                        DeleteModel(model)
+                    '''    lm.append(DeleteModel(model))
+                    for a in lm:
+                        for aa in a:
+                            ans[aa] = False'''
+                    self.send_response(201)
+                except Exception as e:
+                    self.send_response(400)
+                    print(f'Ошибка: {e}')
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                ans = str(ans)
+                self.wfile.write(ans.encode('utf-8'))
     try:
         httpd = HTTPServer((host, int(port)), HandleRequests).serve_forever()
     except Exception:
