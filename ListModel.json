@@ -23,10 +23,5 @@
         "baudrate": 9600,
         "bytesize": 8,
         "timeout": 2
-    },
-    "ABCD": {
-        "baudrate": 9600,
-        "bytesize": 8,
-        "timeout": 2
     }
 }

@@ -6,7 +6,6 @@ import json
 import logging
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs
 
 #region Модели весов
 #Возвращает словарь моделей весов
@@ -43,14 +42,18 @@ def AddModel(dictModel):
     with open("ListModel.json", 'w') as file:
         json.dump(models, file, indent=4)
     listInterface = GetInterface()
-    for key in COMPorts:
-        if listInterface[key]['model'] == dictModel.keys()[0]:
+    q = True
+    l = list(COMPorts.keys())
+    for key in l:
+        if listInterface[key]['model'] == list(dictModel.keys())[0]:
             DeleteCOMPort(key)
             if not CreateNewCOMPort(dict.fromkeys([key], listInterface[key])):
-                print('Модель добавилась/СОМпорт не запущен')
-                return False
-    print("Успешное добавление/изменение модели")
-    return True
+                q = False
+    if q:
+        print("Успешное добавление/изменение модели")
+    else:
+        print('СОМпорт не удалось перезапустить')
+    return q
 #endregion
 
 #region Интерфейс
@@ -365,12 +368,18 @@ def CreateServer(host, port):
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 self.wfile.write(ans.encode('utf-8'))
-            if self.path == '/AddModels' or self.path == '/ChangeModels':
+            if self.path == '/AddModel' or self.path == '/ChangeModel':
                 ans = ''
                 try:
                     l = self.headers['Content-Length']
                     text = self.rfile.read(int(l)).decode()
                     d = eval(text)
+                    print(d)
+                    key = list(d.keys())[0]
+                    d[key]['baudrate'] = int(d[key]['baudrate'])
+                    d[key]['bytesize'] = int(d[key]['bytesize'])
+                    d[key]['timeout'] = int(d[key]['timeout'])
+                    print(d)
                     if AddModel(d):
                         ans = 'Added'
                     else:
@@ -393,7 +402,7 @@ def CreateServer(host, port):
                     ans = 'Not reloaded'
                     print(e)
                 self.wfile.write(ans.encode('utf-8'))
-            if self.path == '/ChangeInterface' or self.path == '/ChangeModels':
+            if self.path == '/ChangeInterface' or self.path == '/ChangeModel':
                 self.do_POST()
 
         def do_DELETE(self):
