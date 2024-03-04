@@ -1,9 +1,4 @@
 {
-    "CAS HD 60": {
-        "baudrate": 9600,
-        "bytesize": 8,
-        "timeout": 2
-    },
     "CKE-60-4050": {
         "baudrate": 9600,
         "bytesize": 8,
@@ -20,6 +15,11 @@
         "timeout": 2
     },
     "CAS CBL-220 H": {
+        "baudrate": 9600,
+        "bytesize": 8,
+        "timeout": 2
+    },
+    "CAS HD 60": {
         "baudrate": 9600,
         "bytesize": 8,
         "timeout": 2

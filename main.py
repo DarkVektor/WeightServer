@@ -16,7 +16,6 @@ def GetModels():
 
 #Удаление модели весов
 def DeleteModel(nameModel):
-    answer = list()
     models = GetModels()
     if models.get(nameModel, None):
         key_list = list(COMPorts.keys())
@@ -25,15 +24,16 @@ def DeleteModel(nameModel):
         for key in key_list:
             if listInterface[key]['model'] == nameModel:
                 DeleteCOMPort(key)
-                answer.append(key)
         del models[nameModel]
         with open("ListModel.json", 'w') as file:
             json.dump(models, file, indent=4)
-        print("Успешное удаление модели")
+        print(f"Успешное удаление модели: {nameModel}")
+        logging.info(f'Успешное удаление модели: {nameModel}')
     else:
         print("Такого значения в списке моделей нет")
-    #Возвращает массив Номеров весов, которые использовали удаленную модель
-    return answer
+        logging.error('Такого значения в списке моделей нет')
+        return False
+    return True
 
 #Добавление/Изменение модели
 def AddModel(dictModel):
@@ -50,9 +50,11 @@ def AddModel(dictModel):
             if not CreateNewCOMPort(dict.fromkeys([key], listInterface[key])):
                 q = False
     if q:
-        print("Успешное добавление/изменение модели")
+        print(f"Успешное добавление/изменение модели: {dictModel}")
+        logging.info(f'Успешное добавление/изменение модели: {dictModel}')
     else:
-        print('СОМпорт не удалось перезапустить')
+        print('Добавление интерфйса прошло. СОМ-порт не удалось перезапустить')
+        logging.error('Добавление интерфйса прошло. СОМ-порт не удалось перезапустить')
     return q
 #endregion
 
@@ -78,10 +80,14 @@ def AddInterface(dictInterface):
     ListInterface.update(dictInterface)
     with open("ListInterface.json", 'w') as file:
         json.dump(ListInterface, file, indent=4)
-    print(answer)
     if CreateNewCOMPort(dictInterface):
+        print(answer)
+        logging.info(answer)
         return True
     else:
+        print(f'COM-порт не запущен: {dictInterface}')
+        logging.info(f'COM-порт не запущен: {dictInterface}')
+        logging.info(answer)
         return False
 
 #Удаление строки интерфейса
@@ -93,14 +99,16 @@ def DeleteInterface(numberWeight):
         ListInterface = dict(sorted(ListInterface.items()))
         with open("ListInterface.json", 'w') as file:
             json.dump(ListInterface, file, indent=4)
-        print("Успешное удаление")
+        print(f"Успешное удаление интерфейса: {numberWeight}")
+        logging.info(f'Успешное удаление интерфейса: {numberWeight}')
     else:
         print("Такого значения в списке интерфейсов нет")
+        logging.error('Такого значения в списке интерфейсов нет')
         return False
     return True
 #endregion
 
-#region COMпорт
+#region COM-порт
 #Возвращает список подключенных COM-портов
 def GetCOMPorts():
     d = dict()
@@ -166,14 +174,14 @@ def CreateNewCOMPort(dictCOM):
                 logging.error(f"COM-порт используется или недоступен: {se}")
                 return False
             except Exception as e:
-                logging.error(f"ERROR: {e}")
+                logging.error(f"Ошибка при создании COM-порта: {e}")
                 return False
         else:
-            print(f"Создание сокета на {dictCOM[key]['weightIP/COM']}")
+            #print(f"Создание сокета на {dictCOM[key]['weightIP/COM']}")
             return False
     else:
-        print("Не могу создать COM-порт с такой моделью(Возможно отсутствует данные этой модели)")
-        logging.error("Не могу создать COM-порт с такой моделью(Возможно отсутствует данные этой модели)")
+        print(f"Не могу создать {dictCOM[key]['weightIP/COM']}-порт с такой моделью(Возможно отсутствует данные этой модели)")
+        logging.error(f"Не могу создать {dictCOM[key]['weightIP/COM']}-порт с такой моделью(Возможно отсутствует данные этой модели)")
         return False
 
 #Перевод данных с COMорта в массив данных для шаблона
@@ -213,15 +221,14 @@ def AddAlwaysListening(key, printerPort):
                                 count += 1
                                 thread = threading.Thread(target=SendToZebra, args=(weight, key))
                                 thread.start()
-                                #SendToZebra(weight, key)
                         else:
                             count = 0
                         prev = s
                 except:
-                    #print("ASDASASSD")
                     pass
     except:
-        print(f"Прерывание прослушивания {COMPort.port}!!!!!")
+        print(f"Прерывание прослушивания {COMPort.port}!")
+        logging.info(f'Прерывание прослушивания {COMPort.port}!')
     finally:
         if COMPort.is_open:
             COMPort.close()
@@ -245,23 +252,15 @@ def AddListening(key, printerPort):
                         logging.info(f"{COMPort.port} получил: {weight}")
                         thread = threading.Thread(target=SendToZebra, args=(weight, key))
                         thread.start()
-                        #SendToZebra(weight, key)
                 except:
-                    print("ASDASASSD")
                     pass
     except:
-        print(f"Прерывание прослушивания {COMPort.port}!!!!!")
+        print(f"Прерывание прослушивания {COMPort.port}!")
+        logging.info(f'Прерывание прослушивания {COMPort.port}!')
     finally:
         if COMPort.is_open:
             COMPort.close()
 
-'''
-def CreateCOMPorts(COMPortsL):
-    for _port in COMPortsL:
-        t = threading.Thread(target=AddListening, args=(_port, "192.168.0.83:9100"))
-        t.start()
-        ThreadingList.append(t)
-'''
 #region Zebra
 #Создание этикетки с данными
 def CompletionZPL(dict):
@@ -290,10 +289,8 @@ def CompletionZPL(dict):
                         tempString = "FD" + str(dict["weight"]) + dict["shtuk"]
                 _stringArr[i] = tempString
                 count += 1
-                print(f"tempString:{tempString}")
             _answerString += '^' + _stringArr[i]
     return _answerString
-
 
 def CreateTemplateDict(dataToSending, key):
     d = dict()
@@ -319,13 +316,12 @@ def SendToZebra(dataToSending, key):
             client.connect((_address[0], int(_address[1])))
             strAns = CompletionZPL(CreateTemplateDict(dataToSending, key))
             _bin_str = str.encode(strAns, encoding='UTF-8')
-            print(_bin_str)
             client.sendall(_bin_str)
-            print(f"Заглушка Отправка на Зебру {dataToSending}")
-            logging.info(f"Заглушка Отправка на Зебру {dataToSending}")
+            print(f"Отправка на Зебру: {dataToSending}")
+            logging.info(f"Отправка на Зебру: {dataToSending}")
     except Exception as e:
-        print(f"Error Sending: {e}")
-        logging.error(f"Error Sending: {e}")
+        print(f"Ошибка при отправке данных на Зебру: {e}")
+        logging.error(f"Ошибка при отправке данных на Зебру: {e}")
     finally:
         client.close()
 #endregion
@@ -335,6 +331,7 @@ def SendToZebra(dataToSending, key):
 #Мини-сервер API
 def CreateServer(host, port):
     class HandleRequests(BaseHTTPRequestHandler):
+        logging.info(f'Успешный запуск сервера API по адресу: {host}:{port}')
         def _set_headers(self):
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -343,6 +340,7 @@ def CreateServer(host, port):
         def do_GET(self):
             self._set_headers()
             ans = ''
+            logging.info(f'Получен запрос GET: {self.path}')
             if self.path == '/Models':
                 ans = str(GetModels())
             elif self.path == '/Interfaces':
@@ -351,6 +349,7 @@ def CreateServer(host, port):
             self.wfile.write(ans)
 
         def do_POST(self):
+            logging.info(f'Получен запрос POST: {self.path}')
             if self.path == '/AddInterface' or self.path == '/ChangeInterface':
                 ans = ''
                 try:
@@ -359,12 +358,16 @@ def CreateServer(host, port):
                     d = eval(text)
                     if not AddInterface(d):
                         ans = 'Not Added'
+                        self.send_response(200)
                     else:
                         ans = 'Added'
+                        self.send_response(201)
                 except Exception as e:
-                    print(f'Ошибка: {e}')
+                    print(f'Ошибка при обработке POST-запроса: {e}')
+                    logging.error(f'Ошибка при обработке POST-запроса: {e}')
                     ans = 'Error'
-                self.send_response(200)
+                    self.send_response(400)
+                #self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 self.wfile.write(ans.encode('utf-8'))
@@ -372,27 +375,29 @@ def CreateServer(host, port):
                 ans = ''
                 try:
                     l = self.headers['Content-Length']
-                    text = self.rfile.read(int(l)).decode()
+                    text = self.rfile.read(int(l)).decode('utf-8')
                     d = eval(text)
-                    print(d)
                     key = list(d.keys())[0]
                     d[key]['baudrate'] = int(d[key]['baudrate'])
                     d[key]['bytesize'] = int(d[key]['bytesize'])
                     d[key]['timeout'] = int(d[key]['timeout'])
-                    print(d)
                     if AddModel(d):
                         ans = 'Added'
+                        self.send_response(201)
                     else:
                         ans = 'Not Added'
+                        self.send_response(200)
                 except Exception as e:
-                    print(f'Ошибка: {e}')
+                    print(f'Ошибка при обработке POST-запроса: {e}')
+                    logging.error(f'Ошибка при обработке POST-запроса: {e}')
                     ans = 'Error'
-                self.send_response(200)
+                    self.send_response(400)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 self.wfile.write(ans.encode('utf-8'))
 
         def do_PUT(self):
+            logging.info(f'Получен запрос PUT: {self.path}')
             if self.path == '/ReloadInterfaces':
                 self._set_headers()
                 try:
@@ -400,12 +405,14 @@ def CreateServer(host, port):
                     ans = 'Reloaded'
                 except Exception as e:
                     ans = 'Not reloaded'
-                    print(e)
+                    print(f'Ошибка при обработке PUT-запроса: {e}')
+                    logging.error(f'Ошибка при обработке PUT-запроса: {e}')
                 self.wfile.write(ans.encode('utf-8'))
             if self.path == '/ChangeInterface' or self.path == '/ChangeModel':
                 self.do_POST()
 
         def do_DELETE(self):
+            logging.info(f'Получен запрос DELETE: {self.path}')
             ans = dict()
             if self.path == '/Interfaces':
                 try:
@@ -418,28 +425,26 @@ def CreateServer(host, port):
                     self.send_response(201)
                 except Exception as e:
                     self.send_response(400)
-                    print(f'Ошибка: {e}')
+                    print(f'Ошибка при обработке DELETE-запроса: {e}')
+                    logging.error(f'Ошибка при обработке DELETE-запроса: {e}')
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 ans = str(ans)
                 self.wfile.write(ans.encode('utf-8'))
             if self.path == '/Models':
-                #lm = list()
                 ans = dict()
                 try:
                     l = self.headers['Content-Length']
                     text = self.rfile.read(int(l)).decode()
                     d = eval(text)
                     for model in d:
-                        DeleteModel(model)
-                    '''    lm.append(DeleteModel(model))
-                    for a in lm:
-                        for aa in a:
-                            ans[aa] = False'''
+                        if DeleteModel(model):
+                            ans[model] = True
                     self.send_response(201)
                 except Exception as e:
                     self.send_response(400)
-                    print(f'Ошибка: {e}')
+                    print(f'Ошибка при обработке DELETE-запроса: {e}')
+                    logging.error(f'Ошибка при обработке DELETE-запроса: {e}')
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 ans = str(ans)
@@ -447,24 +452,40 @@ def CreateServer(host, port):
     try:
         httpd = HTTPServer((host, int(port)), HandleRequests).serve_forever()
     except Exception:
-        httpd.shutdown()
+        logging.error('Прекращение работы сервера API')
 
 if __name__ == '__main__':
-    # Настройка логирования
-    logging.basicConfig(level=logging.INFO, filename="py_log.log", filemode="w", format="[%(asctime)s] <%(levelname)s> %(message)s") #w/a
+    #Загрузка параметров работы программы
+    try:
+        with open("config.json", 'r') as file:
+            _config_params = json.load(file)
+    except:
+        with open("config.json", 'w') as file:
+            _config_params = dict()
+            _config_params['server'] = {'port' : '8080'}
+            _config_params['Log'] = {'Log_path' : "py_log.log", "Filemod" : "w"}
+            json.dump(_config_params, file, indent=4)
+
+    #Настройка логирования
+    logging.basicConfig(
+        level=logging.INFO,
+        filename=_config_params['Log']['Log_path'],
+        filemode=_config_params['Log']['Filemod'],
+        format="[%(asctime)s] <%(levelname)s> %(message)s")
     logging.info("Начало работы программы")
     #Список всех доступных COM-портов
     ports = serial.tools.list_ports.comports()
     for port in ports:
         logging.info(f"{port}")
-    #Открытие конфигурации COM-портов
-    with open("config.json", 'r') as file:
-        _config_params = json.load(file)
-    thread = threading.Thread(target=CreateServer, args=(_config_params['server']['host'], _config_params['server']['port']))
+    # Поле собственного IP
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    server_ip = s.getsockname()[0]
+    s.close()
+    thread = threading.Thread(target=CreateServer, args=(server_ip, _config_params['server']['port']))
     thread.start()
     COMPorts = dict()
-    ThreadingList = list()
     OpenALLCOMPorts()
     print("Конец добавления портов")
-    print(COMPorts)
-    logging.info("Конец работы программы")
+    for com in COMPorts:
+        print(f'{com} : {COMPorts[com]}')

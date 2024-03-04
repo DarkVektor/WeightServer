@@ -2,7 +2,7 @@
     "1": {
         "weightIP/COM": "COM1",
         "model": "CAS HD 60",
-        "printerIP": "192.168.0.1:8080",
+        "printerIP": "192.168.9.76:9100",
         "data": "",
         "time": ""
     },
@@ -14,7 +14,7 @@
         "time": ""
     },
     "3": {
-        "weightIP/COM": "COM5",
+        "weightIP/COM": "COM3",
         "model": "CKE-60-4050",
         "printerIP": "192.168.9.69:9100",
         "data": "",
@@ -22,7 +22,21 @@
     },
     "4": {
         "weightIP/COM": "COM4",
-        "model": "CKE-60-4050",
+        "model": "CAS HD 60",
+        "printerIP": "192.168.9.69:9100",
+        "data": "",
+        "time": ""
+    },
+    "7": {
+        "weightIP/COM": "COM7",
+        "model": "CAS DB-150 H",
+        "printerIP": "192.168.9.69:9100",
+        "data": "",
+        "time": ""
+    },
+    "5": {
+        "weightIP/COM": "COM5",
+        "model": "CAS HD 60",
         "printerIP": "192.168.9.69:9100",
         "data": "",
         "time": ""
