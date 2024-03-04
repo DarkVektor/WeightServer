@@ -1,0 +1,9 @@
+{
+    "server": {
+        "port": "8080"
+    },
+    "Log": {
+        "Log_path": "py_log.log",
+        "Filemod": "w"
+    }
+}

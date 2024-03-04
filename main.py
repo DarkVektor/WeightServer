@@ -10,8 +10,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 #region Модели весов
 #Возвращает словарь моделей весов
 def GetModels():
-    with open("ListModel.json", 'r') as file:
-        _ListModels = json.load(file)
+    try:
+        with open("ListModel.json", 'r') as file:
+            _ListModels = json.load(file)
+    except:
+        _ListModels = dict()
+        with open("ListModel.json", 'w') as file:
+            json.dump(_ListModels, file, indent=4)
     return _ListModels
 
 #Удаление модели весов
@@ -61,8 +66,13 @@ def AddModel(dictModel):
 #region Интерфейс
 #Возвращает словарь интерфейсов
 def GetInterface():
-    with open("ListInterface.json", 'r') as file:
-        _ListInterface = json.load(file)
+    try:
+        with open("ListInterface.json", 'r') as file:
+            _ListInterface = json.load(file)
+    except:
+        _ListInterface = dict()
+        with open("ListInterface.json", 'w') as file:
+            json.dump(_ListInterface, file, indent=4)
     return _ListInterface
 
 #Добавление нового Интерфейса / Перезапись интерфейса весов
@@ -290,6 +300,9 @@ def CompletionZPL(dict):
                 _stringArr[i] = tempString
                 count += 1
             _answerString += '^' + _stringArr[i]
+    else:
+        print('Отсутствует файл шаблона этикетки')
+        logging.error('Отсутствует файл шаблона этикетки')
     return _answerString
 
 def CreateTemplateDict(dataToSending, key):
