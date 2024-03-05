@@ -73,6 +73,7 @@ def GetInterface():
         _ListInterface = dict()
         with open("ListInterface.json", 'w') as file:
             json.dump(_ListInterface, file, indent=4)
+        print('Create new file Interface')
     return _ListInterface
 
 #Добавление нового Интерфейса / Перезапись интерфейса весов
@@ -275,34 +276,37 @@ def AddListening(key, printerPort):
 #Создание этикетки с данными
 def CompletionZPL(dict):
     _answerString = ""
-    if os.path.exists("Template22_8.zpl"):
-        _templateFile = open("Template22_8.zpl", 'r')
-        _templateText = _templateFile.read()
-        _stringArr = _templateText.split('^')
-        count = 0
-        tempString = ""
-        _answerString += _stringArr[0]
-        for i in range(1, len(_stringArr)):
-            if _stringArr[i][:2] == "FN":
-                match count:
-                    case 0:
-                        if (dict["data"]):
-                            tempString = "FD" + dict["data"]
-                        else:
-                            tempString = "FD" + datetime.datetime.now().strftime("%d.%m.%y")
-                    case 1:
-                        if (dict["time"]):
-                            tempString = "FD" + dict["time"]
-                        else:
-                            tempString = "FD" + datetime.datetime.now().strftime("%H:%M")
-                    case 2:
-                        tempString = "FD" + str(dict["weight"]) + dict["shtuk"]
-                _stringArr[i] = tempString
-                count += 1
-            _answerString += '^' + _stringArr[i]
-    else:
-        print('Отсутствует файл шаблона этикетки')
-        logging.error('Отсутствует файл шаблона этикетки')
+    if not os.path.exists("Template22_8.zpl"):
+        with open('Template22_8.zpl', 'w') as file:
+            s = 'CT~~CD,~CC^~CT~\n^XA\n^CWZ,E:TT0003M_.FNT^FS\n^CI28^LH0,0^LS0\n^FX***************Дата********************^FS\n^FO345,10^FB150,1,0,L,0^A0N,20,20^FN1""^FS\n^FX***************Время********************^FS\n^FO460,10^FB50,1,0,R,0^A0N,20,20^FN2""^FS\n^FX***************Вес********************^FS\n^FO345,40^FB150,1,1,C,0^A0N,30,30^FN3""^FS\n^XZ'
+            file.write(s)
+    _templateFile = open("Template22_8.zpl", 'r')
+    _templateText = _templateFile.read()
+    _stringArr = _templateText.split('^')
+    count = 0
+    tempString = ""
+    _answerString += _stringArr[0]
+    for i in range(1, len(_stringArr)):
+        if _stringArr[i][:2] == "FN":
+            match count:
+                case 0:
+                    if (dict["data"]):
+                        tempString = "FD" + dict["data"]
+                    else:
+                        tempString = "FD" + datetime.datetime.now().strftime("%d.%m.%y")
+                case 1:
+                    if (dict["time"]):
+                        tempString = "FD" + dict["time"]
+                    else:
+                        tempString = "FD" + datetime.datetime.now().strftime("%H:%M")
+                case 2:
+                    tempString = "FD" + str(dict["weight"]) + dict["shtuk"]
+            _stringArr[i] = tempString
+            count += 1
+        _answerString += '^' + _stringArr[i]
+    #else:
+    #    print('Отсутствует файл шаблона этикетки')
+    #    logging.error('Отсутствует файл шаблона этикетки')
     return _answerString
 
 def CreateTemplateDict(dataToSending, key):
