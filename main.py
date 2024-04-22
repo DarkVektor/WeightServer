@@ -120,6 +120,17 @@ def DeleteInterface(numberWeight):
 #endregion
 
 #region COM-порт
+
+'''def CheckCOMPorts():
+    for key in COMPorts:
+        s = b'5 kgkg\r\n'
+        try:
+            print(COMPorts[key][0].write(s))
+            print('Send')
+        except Exception as e:
+            print(f'Ошибка на {key} весах: {e}')
+    return
+'''
 #Возвращает список подключенных COM-портов
 def GetCOMPorts():
     d = dict()
@@ -201,8 +212,10 @@ def DataToWeight(strCOM):
     v = ""
     num = False
     for c in strCOM:
-        if c.isdigit() or c == '.' or c == ',':
+        if c.isdigit():
             num = True
+            s += c
+        elif (c == '.' or c == ',') and num:
             s += c
         elif num and c != ' ':
             v += c
@@ -334,11 +347,11 @@ def SendToZebra(dataToSending, key):
             strAns = CompletionZPL(CreateTemplateDict(dataToSending, key))
             _bin_str = str.encode(strAns, encoding='UTF-8')
             client.sendall(_bin_str)
-            print(f"Отправка на Зебру: {dataToSending}")
-            logging.info(f"Отправка на Зебру: {dataToSending}")
+            print(f"Отправка на Зебру: {dataToSending}, с весов №{key} на принтер {printer}")
+            logging.info(f"Отправка на Зебру: {dataToSending}, с весов №{key} на принтер {printer}")
     except Exception as e:
-        print(f"Ошибка при отправке данных на Зебру: {e}")
-        logging.error(f"Ошибка при отправке данных на Зебру: {e}")
+        print(f"Ошибка при отправке данных на Зебру, с весов №{key} на принтер {printer}: {e}")
+        logging.error(f"Ошибка при отправке данных на Зебру, с весов №{key} на принтер {printer}: {e}")
     finally:
         client.close()
 #endregion
@@ -361,6 +374,7 @@ def CreateServer(host, port):
             if self.path == '/Models':
                 ans = str(GetModels())
             elif self.path == '/Interfaces':
+                #CheckCOMPorts()
                 ans = str(GetInterface()) + ';' + str(GetCOMPorts())
             ans = ans.encode('utf-8')
             self.wfile.write(ans)
@@ -482,7 +496,6 @@ if __name__ == '__main__':
             _config_params['server'] = {'port' : '8080'}
             _config_params['Log'] = {'Log_path' : "py_log.log", "Filemod" : "w"}
             json.dump(_config_params, file, indent=4)
-
     #Настройка логирования
     logging.basicConfig(
         level=logging.INFO,
